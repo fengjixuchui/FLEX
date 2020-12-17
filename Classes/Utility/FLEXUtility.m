@@ -15,17 +15,21 @@
 #import <zlib.h>
 
 BOOL FLEXConstructorsShouldRun() {
-    static BOOL _FLEXConstructorsShouldRun_storage = YES;
-    
-    static dispatch_once_t onceToken;
-    dispatch_once(&onceToken, ^{
-        NSString *key = @"FLEX_SKIP_INIT";
-        if (getenv(key.UTF8String) || [NSUserDefaults.standardUserDefaults boolForKey:key]) {
-            _FLEXConstructorsShouldRun_storage = NO;
-        }
-    });
-    
-    return _FLEXConstructorsShouldRun_storage;
+    #if FLEX_DISABLE_CTORS
+        return NO;
+    #else
+        static BOOL _FLEXConstructorsShouldRun_storage = YES;
+        
+        static dispatch_once_t onceToken;
+        dispatch_once(&onceToken, ^{
+            NSString *key = @"FLEX_SKIP_INIT";
+            if (getenv(key.UTF8String) || [NSUserDefaults.standardUserDefaults boolForKey:key]) {
+                _FLEXConstructorsShouldRun_storage = NO;
+            }
+        });
+        
+        return _FLEXConstructorsShouldRun_storage;
+    #endif
 }
 
 @implementation FLEXUtility
@@ -131,7 +135,7 @@ BOOL FLEXConstructorsShouldRun() {
 
 + (UIImage *)previewImageForView:(UIView *)view {
     if (CGRectIsEmpty(view.bounds)) {
-        return nil;
+        return [UIImage new];
     }
     
     CGSize viewSize = view.bounds.size;
@@ -355,14 +359,18 @@ BOOL FLEXConstructorsShouldRun() {
     
     id jsonObject = [NSJSONSerialization JSONObjectWithData:data options:0 error:NULL];
     if ([NSJSONSerialization isValidJSONObject:jsonObject]) {
-        prettyString = [NSString stringWithCString:[NSJSONSerialization
-            dataWithJSONObject:jsonObject options:NSJSONWritingPrettyPrinted error:NULL
-        ].bytes encoding:NSUTF8StringEncoding];
+        // Thanks RaziPour1993
+        prettyString = [[NSString alloc]
+            initWithData:[NSJSONSerialization
+                dataWithJSONObject:jsonObject options:NSJSONWritingPrettyPrinted error:NULL
+            ]
+            encoding:NSUTF8StringEncoding
+        ];
         // NSJSONSerialization escapes forward slashes.
         // We want pretty json, so run through and unescape the slashes.
         prettyString = [prettyString stringByReplacingOccurrencesOfString:@"\\/" withString:@"/"];
     } else {
-        prettyString = [NSString stringWithCString:data.bytes encoding:NSUTF8StringEncoding];
+        prettyString = [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];
     }
     
     return prettyString;
